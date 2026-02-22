@@ -5,7 +5,7 @@ from io import BytesIO
 
 # --- 1. Background API Configuration (FIXED FOR GROQ) ---
 # NOTE: Your key is now hardcoded here. Use llama-3.3-70b-versatile for Groq.
-GROK_API_KEY = "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"
+GROK_API_KEY = ""
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 MODEL_NAME = "llama-3.3-70b-versatile"
 
