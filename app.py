@@ -6,8 +6,9 @@ from io import BytesIO
 # --- 1. Background API Configuration (FIXED FOR GROQ) ---
 # NOTE: Your key is now hardcoded here. Use llama-3.3-70b-versatile for Groq.
 GROK_API_KEY = ""
-GROQ_BASE_URL =
-MODEL_NAME =
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+MODEL_NAME = "llama-3.3-70b-versatile"
+
 # Page config
 st.set_page_config(page_title="Vajra AI: The Digital Kavach", layout="wide", initial_sidebar_state="expanded")
 
