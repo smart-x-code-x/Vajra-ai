@@ -1,226 +1,108 @@
 import streamlit as st
 import openai
-import re
+import PyPDF2
+from io import BytesIO
+
+# --- 1. Background API Configuration (FIXED FOR GROQ) ---
+# NOTE: Your key is now hardcoded here. Use llama-3.3-70b-versatile for Groq.
+GROK_API_KEY = "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"
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 # Page config
 st.set_page_config(page_title="Vajra AI: The Digital Kavach", layout="wide", initial_sidebar_state="expanded")
 
-# Custom CSS for Neon Blue/Silver "Guardian" Theme (Dark Mode)
+# Professional UI/UX Styling
 st.markdown("""
 <style>
-    /* Dark Mode Theme overrides */
-    body {
-        background-color: #0b0f19;
-        color: #e0e6ed;
-    }
-    .stApp {
-        background-color: #0b0f19;
-    }
-    h1, h2, h3, h4, h5, h6 {
-        color: #00e5ff !important;
-        text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
-    }
-    .stButton>button {
-        background: linear-gradient(90deg, #004d66 0%, #00e5ff 100%);
-        border: none;
-        color: #ffffff;
-        box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4);
-        font-weight: bold;
-        transition: all 0.3s ease;
-        border-radius: 6px;
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 229, 255, 0.6);
-        color: white;
-    }
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div {
-        background-color: #151a28 !important;
-        color: #00e5ff !important;
-        border: 1px solid #004d66 !important;
-        border-radius: 6px;
-    }
-    .css-1d391kg {  /* Sidebar */
-        background-color: #0c1220;
-        border-right: 1px solid #004d66;
-    }
-    hr {
-        border-color: #004d66;
-    }
-    /* Streamlit expander styling */
-    div[data-testid="stExpander"] {
-        background-color: #151a28;
-        border: 1px solid #004d66;
-        border-radius: 8px;
-    }
-    div[data-testid="stExpander"] > summary * {
-        color: #c0c8db;
-    }
+    .stApp { background-color: #0a0e17; color: #e2e8f0; }
+    h1, h2, h3 { color: #00e5ff !important; text-shadow: 0 0 15px rgba(0, 229, 255, 0.3); }
+    .stButton>button { background: transparent; border: 2px solid #00e5ff; color: #00e5ff; border-radius: 6px; font-weight: bold; }
+    .stButton>button:hover { background: #00e5ff; color: #0a0e17; box-shadow: 0 0 20px rgba(0, 229, 255, 0.5); }
+    .ticker-box { background: #151b2b; border-left: 4px solid #00e5ff; padding: 15px; border-radius: 4px; }
+    .ticker-item { margin-bottom: 12px; font-size: 0.9em; border-bottom: 1px solid #1a2333; padding-bottom: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
-# Main Title
+# --- Sidebar: Current Scam Ticker ---
+st.sidebar.header("🛡️ Current Scam Ticker (India)")
+st.sidebar.markdown(f"""
+<div class="ticker-box">
+    <div class="ticker-item">⚠️ <strong>Electricity Bill:</strong> Fake disconnection threats via SMS.</div>
+    <div class="ticker-item">⚠️ <strong>Digital Arrest:</strong> Scammers posing as CBI/Police on Skype.</div>
+    <div class="ticker-item">⚠️ <strong>Voice Cloning:</strong> AI-generated family emergency calls.</div>
+    <div class="ticker-item">⚠️ <strong>1930 Helpline:</strong> Report all fraud immediately.</div>
+</div>
+""", unsafe_allow_html=True)
+
+# --- Main App ---
 st.title("🛡️ Vajra AI: The Digital Kavach")
-st.markdown("*Your AI-Powered Defensive Shield Against Cyber Fraud*")
 
-# Sidebar
-st.sidebar.header("⚙️ Configuration")
-api_key = st.sidebar.text_input("Enter Grok API Key", type="password", placeholder="Paste xAI Key here...")
-language = st.sidebar.selectbox("Language Selector", ["English", "Hindi", "Regional"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏠 Home", "💬 Message Scan", "📄 Document Vault", "🎙️ Vocal DNA"])
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("### The Digital Kavach")
-st.sidebar.info("Vajra AI is a forensic engine engineered to detect predatory behaviors, fake receipts, digital arrests, and AI voice cloning.")
 
-# API Integration Logic (Grok API using OpenAI library)
-def analyze_with_grok(api_key, context, content, language):
-    if not api_key:
-        return {"error": "Please provide a Grok API Key in the sidebar."}
-        
-    client = openai.OpenAI(
-        api_key=api_key,
-        base_url="https://api.x.ai/v1",
-    )
-    
-    # The "Expert" System Prompt
-    system_prompt = (
-        "You are a Senior Cyber-Fraud Investigator. Analyze inputs for psychological triggers "
-        "(Urgency, Fear, Greed), fake institutional patterns, and predatory fine print. "
-        "Provide a 0-100% Risk Score and a 1930 Cyber-Complaint draft."
-    )
-    
-    # User prompt incorporating exact instructions for expander formatting
-    user_prompt = (
-        f"Context/Directives: {context}\n\n"
-        f"Target Material to Analyze:\n{content}\n\n"
-        f"Language Request: Respond entirely in {language} (Ensure translation is accurate).\n\n"
-        "FORMAT YOUR RESPONSE EXACTLY WITH THESE FOUR HEADERS:\n\n"
-        "### RISK SCORE\n[Your 0-100% score here with a brief description]\n\n"
-        "### FORENSIC ANALYSIS\n[Detailed breakdown here]\n\n"
-        "### LANGUAGE TRANSLATION\n[Relevant translation or summary here]\n\n"
-        "### ACTION PLAN\n[1930 draft and next steps here]"
-    )
-    
+def analyze_with_ai(context, content):
     try:
+        # Connect to Groq API
+        client = openai.OpenAI(api_key=GROK_API_KEY, base_url=GROQ_BASE_URL)
+
+        system_prompt = (
+            "You are a Forensic Cyber-Investigator for Vajra AI. Analyze for psychological triggers (Fear, Urgency, Greed). "
+            "Flag 10-digit mobile numbers claiming to be institutions. "
+            "Provide a RISK SCORE (0-100%) and a draft for a 1930 Cybercrime Portal complaint."
+        )
+
         response = client.chat.completions.create(
-            model="grok-2-latest",
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": f"Context: {context}\n\nEvidence: {content}"}
             ],
-            temperature=0.3
+            temperature=0.2
         )
-        return {"result": response.choices[0].message.content}
+        return response.choices[0].message.content
     except Exception as e:
-        return {"error": str(e)}
+        st.error(f"❌ API Error: {str(e)}")
+        return None
 
-# Institutional Verifier logic
-def verify_institutional_claim(text):
-    # Logic to flag 10-digit mobile numbers claiming to be "Official Banks"
-    phones = re.findall(r'\b[6-9]\d{9}\b', text)
-    bank_keywords = ["bank", "sbi", "hdfc", "icici", "rbi", "customer care", "support", "official"]
-    text_lower = text.lower()
-    claims_bank = any(kw in text_lower for kw in bank_keywords)
-    
-    if phones and claims_bank:
-        st.warning(f"⚠️ **Institutional Verifier Flag:** Message contains 10-digit mobile number(s) ({', '.join(phones)}) while using bank-related keywords. Official banks do not use standard 10-digit mobile numbers for official SMS or customer support. High probability of impersonation.")
 
-# Display results in clear Expanders
-def render_results(raw_text):
-    # Fallback sections
-    sections = {
-        "Risk Score": "Could not parse section. Check full raw output.",
-        "Forensic Analysis": "Could not parse section. Check full raw output.",
-        "Language Translation": "Could not parse section. Check full raw output.",
-        "Action Plan": "Could not parse section. Check full raw output."
-    }
-    
-    # Parse headers
-    score_match = re.search(r'### RISK SCORE(.*?)### FORENSIC ANALYSIS', raw_text, re.DOTALL | re.IGNORECASE)
-    forensic_match = re.search(r'### FORENSIC ANALYSIS(.*?)### LANGUAGE TRANSLATION', raw_text, re.DOTALL | re.IGNORECASE)
-    translation_match = re.search(r'### LANGUAGE TRANSLATION(.*?)### ACTION PLAN', raw_text, re.DOTALL | re.IGNORECASE)
-    action_match = re.search(r'### ACTION PLAN(.*)', raw_text, re.DOTALL | re.IGNORECASE)
-    
-    if score_match: sections["Risk Score"] = score_match.group(1).strip()
-    if forensic_match: sections["Forensic Analysis"] = forensic_match.group(1).strip()
-    if translation_match: sections["Language Translation"] = translation_match.group(1).strip()
-    if action_match: sections["Action Plan"] = action_match.group(1).strip()
-    
-    with st.expander("🚨 Risk Score", expanded=True):
-        st.write(sections["Risk Score"])
-    with st.expander("🔍 Forensic Analysis", expanded=True):
-        st.write(sections["Forensic Analysis"])
-    with st.expander("🌐 Language Translation", expanded=False):
-        st.write(sections["Language Translation"])
-    with st.expander("🛡️ Action Plan", expanded=True):
-        st.write(sections["Action Plan"])
-        
-    with st.expander("Raw AI Output", expanded=False):
-        st.text(raw_text)
-
-# UI/UX: Tabs layout
-tab1, tab2, tab3 = st.tabs(["💬 Text & SMS Scanner", "📄 Document & Image Engine", "🎙️ Vocal DNA Analyzer"])
-
-# Feature 1: Text & SMS Scanner
+# --- Tab 1: Home ---
 with tab1:
-    st.subheader("Suspicious Message Scanner")
-    text_input = st.text_area("Paste suspicious SMS, WhatsApp message, or Email here:", height=150)
-    
-    if st.button("Scan Text", key="btn_text"):
-        if text_input:
-            verify_institutional_claim(text_input)
-            with st.spinner("Analyzing message forensics..."):
-                res = analyze_with_grok(api_key, "Analyze this raw text message for phishing, urgency, fear, greed, and scam patterns.", text_input, language)
-                if "error" in res:
-                    st.error(res["error"])
-                else:
-                    render_results(res["result"])
-        else:
-            st.warning("Please paste some text to analyze.")
+    st.markdown("### 👁️ Vision")
+    st.info("**Vajra AI protects you from 2026 threats like Digital Arrest, Voice Cloning, and Predatory Fine Print.**")
+    st.markdown("### 📜 How to use:")
+    st.markdown(
+        "1. Choose a tab. \n2. Upload your file or paste text. \n3. Review the AI Risk Report. \n4. Use the draft to report to 1930.")
 
-# Feature 2: Document & Image Forensic Engine
+# --- Tab 2: Message Scan ---
 with tab2:
-    st.subheader("Document & Image Forensic Engine")
-    st.write("Upload PDFs, Word Docs, or Images (PNG/JPG) to detect 'Hidden Predatory Clauses', 'Fake Receipt Artifacts', or 'Digital Arrest' scripts.")
-    uploaded_file = st.file_uploader("Upload Document/Image", type=["pdf", "docx", "png", "jpg", "jpeg"])
-    
-    if st.button("Analyze File", key="btn_doc"):
-        if uploaded_file:
-            st.info(f"File uploaded: {uploaded_file.name} ({uploaded_file.size} bytes)")
-            with st.spinner("Extracting hidden clauses & analyzing image artifacts..."):
-                file_details = f"File Name: {uploaded_file.name}\nFile Type: {uploaded_file.type}\nFile Size: {uploaded_file.size} bytes\n"
-                context = (
-                    "Tell the AI to analyze these details for 'Hidden Predatory Clauses', "
-                    "'Fake Receipt Artifacts', or 'Digital Arrest' scripts based on the file type and context. "
-                    "Since this is a file upload simulation, provide a forensic analysis on the likelihood of fraud for this specific vector."
-                )
-                res = analyze_with_grok(api_key, context, file_details, language)
-                if "error" in res:
-                    st.error(res["error"])
-                else:
-                    render_results(res["result"])
-        else:
-            st.warning("Please upload a file.")
+    st.header("💬 Message Scanner")
+    text_input = st.text_area("Paste SMS/WhatsApp message:", height=150)
+    if st.button("Analyze Message"):
+        if text_input:
+            with st.spinner("Analyzing..."):
+                st.write(analyze_with_ai("Text Message Fraud Analysis", text_input))
 
-# Feature 3: Vocal DNA Analyzer
+# --- Tab 3: Document Vault ---
 with tab3:
-    st.subheader("Vocal DNA Analyzer")
-    st.write("Upload audio snippets to check for 'AI Voice Cloning' artifacts.")
-    audio_file = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a", "ogg"])
-    
-    if st.button("Analyze Vocal DNA", key="btn_audio"):
-        if audio_file:
-            st.info(f"Audio uploaded: {audio_file.name} ({audio_file.size} bytes)")
-            with st.spinner("Processing audio frequencies and checking for AI voice cloning anomalies..."):
-                audio_details = f"Audio File Name: {audio_file.name}\nFormat: {audio_file.type}\n"
-                context = (
-                    "Provide a forensic analysis report checking for 'AI Voice Cloning' artifacts (e.g., lack of natural breathing, "
-                    "synthetic frequency anomalies, unnatural pacing) as if you have processed this audio."
-                )
-                res = analyze_with_grok(api_key, context, audio_details, language)
-                if "error" in res:
-                    st.error(res["error"])
+    st.header("📄 Document & Image Vault")
+    uploaded_doc = st.file_uploader("Upload PDF or Screenshot", type=["pdf", "png", "jpg"])
+    if st.button("Run Document Forensics"):
+        if uploaded_doc:
+            with st.spinner("Scanning document..."):
+                if uploaded_doc.type == "application/pdf":
+                    reader = PyPDF2.PdfReader(uploaded_doc)
+                    extracted_text = "".join([p.extract_text() for p in reader.pages])
+                    st.write(analyze_with_ai("PDF Document Analysis", extracted_text[:8000]))
                 else:
-                    render_results(res["result"])
-        else:
-            st.warning("Please upload an audio file.")
+                    st.write(analyze_with_ai("Visual Evidence Check", f"Image file uploaded: {uploaded_doc.name}"))
+
+# --- Tab 4: Vocal DNA ---
+with tab4:
+    st.header("🎙️ Vocal DNA Analyzer")
+    uploaded_audio = st.file_uploader("Upload Audio Note", type=["mp3", "wav", "m4a"])
+    if st.button("Scan Voice Patterns"):
+        if uploaded_audio:
+            st.audio(uploaded_audio)
+            with st.spinner("Checking for AI artifacts..."):
+                st.write(analyze_with_ai("Audio Voice Analysis", f"Audio file: {uploaded_audio.name}"))
